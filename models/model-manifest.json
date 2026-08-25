@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.0",
+  "project": "sign-language-to-speech-converter",
+  "production_model": {
+    "artifact": "text_phrase_image_model.pkl",
+    "status": "external_required_artifact",
+    "size_bytes": 31561578,
+    "sha256": "8940bc71a72ef1e30feadf7414d67b643fa07090bc84dce616c5d43c50380c23",
+    "framework": "scikit-learn",
+    "framework_version_validated": "1.6.1",
+    "pipeline": {
+      "type": "sklearn.pipeline.Pipeline",
+      "steps": [
+        "GestureFeatureExtractor",
+        "ExtraTreesClassifier"
+      ]
+    },
+    "input_features": 144,
+    "engineered_features": 328,
+    "classifier": {
+      "type": "ExtraTreesClassifier",
+      "n_estimators": 250,
+      "random_state": 42,
+      "n_jobs": 1,
+      "min_samples_leaf": 1,
+      "max_depth": null
+    },
+    "output_classes": 43
+  },
+  "label_encoder": {
+    "artifact": "text_phrase_image_label_encoder.pkl",
+    "status": "tracked_artifact",
+    "size_bytes": 2907,
+    "sha256": "568dc76c225cd7c018c8e0b8df551a24154c0d8aa1c6df25ce50dc911c498dc9",
+    "classes": 43
+  },
+  "yolo_model": {
+    "artifact": "text_phrase_yolo_cls.pt",
+    "status": "tracked_artifact",
+    "size_bytes": 3073160,
+    "sha256": "4bdf0b8b4d1d8377c5c417d163411178b5dd7b4724f4740715b8ef4f8d418264"
+  },
+  "mediapipe_landmarker": {
+    "artifact": "holistic_landmarker.task",
+    "status": "tracked_artifact",
+    "size_bytes": 13683609,
+    "sha256": "e2dab61191e2dcd0a15f943d8e3ed1dce13c82dfa597b9dd39f562975a50c3f8"
+  },
+  "feature_contract": {
+    "raw_input_features": 144,
+    "engineered_output_features": 328,
+    "include_raw": false
+  },
+  "reproducibility": {
+    "production_random_state": 42,
+    "production_n_estimators": 250,
+    "training_factory_default_n_estimators": 350,
+    "note": "The serialized production artifact is authoritative. The current training factory default differs and must not be interpreted as a request to retrain or modify the production model."
+  }
+}
