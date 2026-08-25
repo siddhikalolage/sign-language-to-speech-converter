@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "project": "sign-language-to-speech-converter",
+  "artifacts": {
+    "landmark_classifier": {
+      "path": "text_phrase_image_model.pkl",
+      "backend": "scikit-learn",
+      "pipeline": "GestureFeatureExtractor + ExtraTreesClassifier",
+      "status": "required_for_landmark_and_auto_modes",
+      "expected_landmark_features": 144
+    },
+    "landmark_label_encoder": {
+      "path": "text_phrase_image_label_encoder.pkl",
+      "backend": "scikit-learn LabelEncoder",
+      "status": "required_for_landmark_and_auto_modes"
+    },
+    "yolo_classifier": {
+      "path": "text_phrase_yolo_cls.pt",
+      "backend": "Ultralytics YOLO classification",
+      "status": "required_for_yolo_and_auto_fallback"
+    },
+    "yolo_class_map": {
+      "path": "yolo_phrase_dataset/class_name_map.json",
+      "backend": "JSON",
+      "status": "required_for_yolo_and_auto_fallback"
+    },
+    "mediapipe_landmarker": {
+      "path": "holistic_landmarker.task",
+      "backend": "MediaPipe Tasks",
+      "status": "required_for landmark extraction"
+    }
+  },
+  "reproducibility": {
+    "random_state": 42,
+    "feature_dimension": 144,
+    "training_script": "train_text_gesture_model.py",
+    "runtime_manifest": "requirements.txt"
+  },
+  "note": "The production landmark model is intentionally tracked while experimental/backup pickle artifacts remain ignored. Dataset folders remain local because of repository size."
+}
