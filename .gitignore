@@ -1,4 +1,4 @@
-﻿# Python environments
+# Python environments
 .venv/
 .venv-1/
 venv/
@@ -47,17 +47,11 @@ text_phrase_image_model_refreshed.pkl
 text_phrase_image_model_augmented_fast.pkl
 text_phrase_image_model.pre_hand_focus_20260620_175818.pkl
 
-# Project datasets - keep local
-yolo_phrase_dataset/
-images for phrases/
-text_phrase_image_data/
-text_phrase_image_data.old_20260619_223659/
-text_phrase_image_data_refreshed/
-
-# Other large ML model artifacts
+# Other generated / experimental pickle artifacts
 *.pkl
 
-# Small label encoders - keep
+# Production landmark model + label encoder are intentional repository artifacts
+!text_phrase_image_model.pkl
 !text_phrase_image_label_encoder.pkl
 !text_phrase_image_label_encoder.old_20260619_223516.pkl
 !text_phrase_image_label_encoder.pre_aug_20260619_225206.pkl
@@ -66,3 +60,10 @@ text_phrase_image_data_refreshed/
 !text_phrase_image_label_encoder_augmented.pkl
 !text_phrase_image_label_encoder_augmented_fast.pkl
 !text_phrase_image_label_encoder_refreshed.pkl
+
+# Project datasets - keep local
+yolo_phrase_dataset/
+images for phrases/
+text_phrase_image_data/
+text_phrase_image_data.old_20260619_223659/
+text_phrase_image_data_refreshed/
