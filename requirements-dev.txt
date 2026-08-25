@@ -1,0 +1,6 @@
+﻿-r web_requirements.txt
+
+pytest==8.4.2
+matplotlib==3.10.9
+seaborn
+torch

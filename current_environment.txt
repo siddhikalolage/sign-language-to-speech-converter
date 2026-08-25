@@ -1,0 +1,64 @@
+﻿SIGN LANGUAGE TO SPEECH CONVERTER
+ENVIRONMENT SNAPSHOT
+================================
+
+Captured: 2026-08-25
+
+Python
+------
+Python 3.10.11
+
+Production ML compatibility
+----------------------------
+scikit-learn==1.6.1
+joblib==1.5.3
+numpy==1.26.4
+scipy==1.15.3
+
+Computer vision / landmarks
+---------------------------
+mediapipe==0.10.21
+opencv-python==5.0.0.93
+opencv-contrib-python==4.11.0.86
+pillow==12.3.0
+
+Web application
+---------------
+fastapi==0.141.1
+uvicorn==0.52.3
+pydantic==2.13.4
+
+Additional environment packages
+-------------------------------
+absl-py==2.5.0
+attrs==26.1.0
+flatbuffers==25.12.19
+protobuf==4.25.9
+sounddevice==0.5.6
+matplotlib==3.10.9
+jax==0.6.2
+jaxlib==0.6.2
+sentencepiece==0.2.2
+
+Production artifact contract
+----------------------------
+Input features: 144
+Engineered features: 328
+Output classes: 43
+Production estimator: ExtraTreesClassifier
+Production estimators: 250
+Production random state: 42
+Production sklearn version validated: 1.6.1
+
+Notes
+-----
+The serialized production model is authoritative.
+
+The production model is intentionally excluded from Git because of
+repository artifact-size policy.
+
+The exact production artifact fingerprint is maintained in:
+models/model-manifest.json
+
+This file is an environment snapshot.
+It is not the authoritative dependency installation file.
