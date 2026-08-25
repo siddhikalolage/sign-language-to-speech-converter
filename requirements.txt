@@ -1,0 +1,14 @@
+# Runtime dependencies for the sign-language-to-speech-converter
+# Keep this file aligned with the validated local environment.
+# Exact versions are intentionally recorded only when verified against the
+# existing project artifacts; do not change ML package versions casually.
+
+fastapi
+uvicorn
+opencv-python
+numpy
+joblib
+scikit-learn==1.6.3
+mediapipe
+ultralytics
+torch
