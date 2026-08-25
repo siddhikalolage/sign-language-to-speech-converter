@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign Language Converter</title>
+  <link rel="stylesheet" href="/web/styles.css?v=handfast2">
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <p class="eyebrow">Final Project</p>
+      <h1>Sign Language Converter</h1>
+      <p class="subtitle">Build spoken text from live sign predictions.</p>
+    </section>
+
+    <section class="panel control-panel">
+      <div class="control-row">
+        <div>
+          <p class="label">Model</p>
+          <div class="toggle-group" id="modeToggle">
+            <button class="toggle" data-mode="auto" type="button">Auto</button>
+            <button class="toggle active" data-mode="landmark" type="button">Landmark</button>
+            <button class="toggle" data-mode="yolo" type="button">YOLO</button>
+          </div>
+        </div>
+        <div>
+          <p class="label">Source</p>
+          <div class="toggle-group" id="sourceToggle">
+            <button class="toggle active" data-source="camera" type="button">Camera</button>
+            <button class="toggle" data-source="upload" type="button">Upload</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="workspace">
+      <div class="panel viewer-panel">
+        <div class="viewer" id="cameraView">
+          <video id="video" autoplay playsinline muted></video>
+          <div class="hand-overlay" id="handOverlay"></div>
+          <canvas id="captureCanvas" hidden></canvas>
+        </div>
+        <div class="viewer upload hidden" id="uploadView">
+          <label class="upload-box" for="imageInput">
+            <input id="imageInput" type="file" accept="image/*">
+            <span>Choose an image to classify</span>
+          </label>
+          <img id="uploadPreview" alt="Uploaded preview">
+        </div>
+
+        <div class="action-row">
+          <button class="primary" id="predictButton" type="button">Predict</button>
+          <button class="secondary" id="speakButton" type="button">Speak</button>
+          <button class="secondary" id="undoButton" type="button">Undo</button>
+          <button class="secondary" id="clearButton" type="button">Clear</button>
+        </div>
+      </div>
+
+      <div class="panel result-panel">
+        <p class="result-label">Last word</p>
+        <div class="result-word" id="resultWord">Waiting</div>
+        <p class="result-meta" id="resultMeta">Point the camera at a phrase or upload an image.</p>
+        <p class="result-label sentence-label">Sentence</p>
+        <div class="sentence-box" id="sentenceText">No words yet.</div>
+        <div class="status-pill" id="statusPill">Idle</div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/web/app.js?v=handfast2"></script>
+</body>
+</html>

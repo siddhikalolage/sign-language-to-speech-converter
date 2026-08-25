@@ -1,0 +1,68 @@
+﻿# Python environments
+.venv/
+.venv-1/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ML / tool caches
+.ultralytics/
+.sixth/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+
+# Large experimental / backup ML models
+text_phrase_image_model_augmented.pkl
+text_phrase_image_model.large_aug_20260619_225346.pkl
+text_phrase_image_model.pre_hands_only_20260620_175818.pkl
+text_phrase_image_model.old_20260619_223516.pkl
+text_phrase_image_model.pre_aug_20260619_225206.pkl
+text_phrase_image_model_refreshed.pkl
+text_phrase_image_model_augmented_fast.pkl
+text_phrase_image_model.pre_hand_focus_20260620_175818.pkl
+
+# Project datasets - keep local
+yolo_phrase_dataset/
+images for phrases/
+text_phrase_image_data/
+text_phrase_image_data.old_20260619_223659/
+text_phrase_image_data_refreshed/
+
+# Other large ML model artifacts
+*.pkl
+
+# Small label encoders - keep
+!text_phrase_image_label_encoder.pkl
+!text_phrase_image_label_encoder.old_20260619_223516.pkl
+!text_phrase_image_label_encoder.pre_aug_20260619_225206.pkl
+!text_phrase_image_label_encoder.pre_hand_focus_20260620_124809.pkl
+!text_phrase_image_label_encoder.pre_hands_only_20260620_175818.pkl
+!text_phrase_image_label_encoder_augmented.pkl
+!text_phrase_image_label_encoder_augmented_fast.pkl
+!text_phrase_image_label_encoder_refreshed.pkl

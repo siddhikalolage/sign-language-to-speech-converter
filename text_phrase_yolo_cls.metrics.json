@@ -1,0 +1,7 @@
+{
+  "top1": 0.8352272510528564,
+  "top5": 0.9943181872367859,
+  "fitness": 0.9147727191448212,
+  "save_dir": "runs\\yolo_phrase_cls\\phrase_yolo",
+  "source_run": "runs\\yolo_phrase_cls\\phrase_yolo"
+}
