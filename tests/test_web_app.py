@@ -60,3 +60,41 @@ def test_unsupported_prediction_mode():
 
     assert exc_info.value.status_code == 400
     assert "Unsupported mode" in str(exc_info.value.detail)
+
+def test_empty_image_payload():
+    payload = web_app.PredictRequest(
+        image_data="",
+        mode="auto",
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        web_app.predict(payload)
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "Image payload is required."
+
+
+def test_invalid_base64_payload():
+    payload = web_app.PredictRequest(
+        image_data="%%%%not-base64%%%%",
+        mode="auto",
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        web_app.predict(payload)
+
+    assert exc_info.value.status_code == 400
+    assert "Invalid image payload" in str(exc_info.value.detail)
+
+
+def test_oversized_base64_payload():
+    payload = web_app.PredictRequest(
+        image_data="A" * (web_app.MAX_IMAGE_BASE64_LENGTH + 1),
+        mode="auto",
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        web_app.predict(payload)
+
+    assert exc_info.value.status_code == 413
+    assert exc_info.value.detail == "Image payload is too large."

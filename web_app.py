@@ -38,6 +38,8 @@ LANDMARK_MIN_MARGIN = 0.25
 LANDMARK_MIN_QUALITY = 0.55
 LANDMARK_MIN_HAND_POINTS = DEFAULT_MIN_HAND_POINTS
 LANDMARK_MAX_FRAME_WIDTH = 320
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
+MAX_IMAGE_BASE64_LENGTH = 8 * 1024 * 1024
 YOLO_MIN_CONFIDENCE = 0.40
 AUTO_YOLO_MIN_CONFIDENCE = 0.90
 
@@ -184,13 +186,31 @@ class RuntimeRegistry:
 
 
 def decode_image(image_data: str) -> np.ndarray:
-    payload = image_data
-    if "," in image_data:
-        _, payload = image_data.split(",", 1)
+    if not isinstance(image_data, str) or not image_data.strip():
+        raise HTTPException(status_code=400, detail="Image payload is required.")
+
+    payload = image_data.strip()
+    if "," in payload:
+        _, payload = payload.split(",", 1)
+
+    payload = payload.strip()
+
+    if not payload:
+        raise HTTPException(status_code=400, detail="Image payload is empty.")
+
+    if len(payload) > MAX_IMAGE_BASE64_LENGTH:
+        raise HTTPException(status_code=413, detail="Image payload is too large.")
+
     try:
-        image_bytes = base64.b64decode(payload)
+        image_bytes = base64.b64decode(payload, validate=True)
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Invalid image payload: {exc}") from exc
+
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="Image payload is empty.")
+
+    if len(image_bytes) > MAX_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail="Image payload is too large.")
 
     array = np.frombuffer(image_bytes, dtype=np.uint8)
     frame = cv2.imdecode(array, cv2.IMREAD_COLOR)
