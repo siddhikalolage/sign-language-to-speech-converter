@@ -1,280 +1,345 @@
-Sign Language to Speech Converter
+# Sign Language to Speech Converter
 
-A real-time sign-language phrase recognition system that converts hand/face landmark observations into human-readable phrases and optional speech output.
+A production-oriented sign-language recognition system that converts visual sign input into human-readable phrases and optional speech output.
 
-The project contains two inference paths:
+The repository is engineered around an existing serialized production model. Current hardening focuses on reliability, explicit contracts, validation, testing, reproducibility, API safety, CI, and maintainability rather than unnecessary model retraining.
 
-Landmark-based recognition — primary production path
+## Engineering status
 
-YOLO image classification — secondary/backup path
+| Area | Status |
+|---|---|
+| Landmark inference pipeline | Production artifact validated |
+| Feature contract | 144 raw → 328 engineered features |
+| Production classifier | ExtraTrees, 250 trees, 43 classes |
+| YOLO fallback | Available |
+| Artifact integrity validation | Automated |
+| API validation | Automated tests |
+| CI quality gate | GitHub Actions |
+| Production-model retraining | Intentionally not part of hardening |
 
-Production-model policy: This repository is being improved without retraining or replacing the existing trained models. The serialized production artifacts are treated as authoritative.
+Latest local verification in this hardening phase: **27 tests passed**. The application test suite reports two FastAPI deprecation warnings related to `@app.on_event`; these are warnings, not test failures.
 
-1. Project Overview
+## 1. System architecture
 
-The system captures a user's sign-language gesture through a camera or uploaded image, extracts visual/landmark information, predicts a phrase, and can convert the recognized phrase into speech.
+```text
+                    Camera / Uploaded Image
+                              │
+                ┌─────────────┴─────────────┐
+                │                           │
+                ▼                           ▼
+        Landmark inference             YOLO inference
+                │                           │
+        MediaPipe landmarks          Image classifier
+                │                           │
+           144 raw values                 Class
+                │                           │
+                ▼                           │
+      GestureFeatureExtractor              │
+                │                           │
+        328 engineered features            │
+                │                           │
+                ▼                           │
+       ExtraTreesClassifier                │
+                │                           │
+             43 classes                    │
+                │                           │
+                └─────────────┬─────────────┘
+                              ▼
+                       Phrase / Sentence
+                              │
+                    ┌─────────┴─────────┐
+                    ▼                   ▼
+              Web interface       Speech output
+```
 
-Primary inference architecture
+The landmark path is the primary production path. The web application can use YOLO as a secondary path and automatic fallback when the landmark result does not meet configured reliability thresholds.
 
-Camera / Image
-      │
-      ▼
-MediaPipe Holistic Landmarks
-      │
-      ▼
-144 raw landmark values
-      │
-      ▼
+## 2. Production ML contract
+
+The serialized landmark model is a scikit-learn `Pipeline` containing:
+
+```text
 GestureFeatureExtractor
-      │
-      ▼
-328 engineered geometric features
-      │
-      ▼
+        ↓
 ExtraTreesClassifier
-      │
-      ▼
-43 gesture classes
-      │
-      ▼
-Label Encoder
-      │
-      ▼
-Human-readable phrase
-      │
-      ▼
-Sentence Builder / Speech Output
+```
 
-The landmark pipeline deliberately uses geometric landmark features rather than depending directly on image background pixels. This makes the primary model more suitable for variation in background and camera framing.
+| Property | Value |
+|---|---:|
+| Raw input features | 144 |
+| Engineered features | 328 |
+| Classifier | ExtraTreesClassifier |
+| Trees | 250 |
+| Random state | 42 |
+| `n_jobs` | 1 |
+| `min_samples_leaf` | 1 |
+| Output classes | 43 |
+| Validated scikit-learn version | 1.6.1 |
 
-2. Key Capabilities
+The 144 raw values represent 48 landmarks × 3 coordinates:
 
-Real-time webcam gesture recognition
+- Face: 6 × 3 = 18
+- Left hand: 21 × 3 = 63
+- Right hand: 21 × 3 = 63
+- **Total: 144**
 
-Phrase-level sign recognition
+The feature extractor transforms these observations into 328 geometric features before classification.
 
-43 supported phrase classes in the production landmark model
+## 3. Feature engineering
 
-MediaPipe-based landmark extraction
+`gesture_features.py` contains the core feature-engineering layer and preserves the raw-landmark to classifier-input contract.
 
-Hand-centered geometric feature engineering
+The engineered representation includes information such as:
 
-ExtraTrees classification
+- hand presence
+- hand centroids and wrist positions
+- normalized landmark coordinates
+- wrist-relative coordinates
+- hand extent and scale
+- fingertip-to-wrist distances
+- joint-angle features
+- two-hand relative distances
+- two-hand wrist and centroid displacement
 
-YOLO-based backup image classification
+The classifier therefore operates on geometric structure rather than directly depending on image background pixels.
 
-Automatic model selection/fallback in the web application
+## 4. Production artifacts
 
-Sentence construction from recognized signs
+| Artifact | Purpose |
+|---|---|
+| `text_phrase_image_model.pkl` | Primary landmark classification pipeline |
+| `text_phrase_image_label_encoder.pkl` | Class-index → phrase mapping |
+| `text_phrase_yolo_cls.pt` | YOLO image-classification fallback |
+| `holistic_landmarker.task` | MediaPipe landmark model |
+| `yolo_phrase_dataset/class_name_map.json` | YOLO class-name mapping |
 
-Speech output
+Artifact metadata is maintained in `models/model-manifest.json`. The manifest records artifact identity, SHA-256 fingerprints, framework/version information, feature dimensions, classifier configuration, and reproducibility information.
 
-Webcam and image-upload web interface
+**Production policy:** the serialized production artifact is authoritative. The training factory may expose a different default estimator count; that metadata must not be interpreted as a request to retrain the production model.
 
-Artifact integrity validation
+## 5. Artifact validation
 
-Explicit model/feature contracts
+Run:
 
-Reproducibility metadata and SHA-256 fingerprints
-
-3. Production ML Pipeline
-
-The current serialized landmark model is a scikit-learn Pipeline:
-
-Pipeline
-├── GestureFeatureExtractor
-└── ExtraTreesClassifier
-
-Input contract
-
-Property
-
-Value
-
-Raw input features
-
-144
-
-Landmark representation
-
-48 × 3 coordinates
-
-Engineered features
-
-328
-
-Classifier
-
-ExtraTreesClassifier
-
-Trees
-
-250
-
-Random state
-
-42
-
-Classes
-
-43
-
-scikit-learn validated version
-
-1.6.1
-
-The 144-value input is interpreted by the feature extractor as:
-
-Face landmarks      6 × 3 = 18
-Left-hand landmarks 21 × 3 = 63
-Right-hand landmarks 21 × 3 = 63
---------------------------------
-Total                    = 144
-
-The feature extractor converts these observations into 328 engineered features.
-
-4. Feature Engineering
-
-gesture_features.py contains the main feature-engineering layer.
-
-The extractor creates several types of geometric information:
-
-hand presence indicators
-
-hand centroids
-
-wrist positions
-
-reference-normalized landmark coordinates
-
-wrist-relative landmark coordinates
-
-hand extent/scale
-
-fingertip-to-wrist distances
-
-joint-angle features
-
-two-hand relative distances
-
-two-hand wrist displacement
-
-two-hand centroid displacement
-
-This is important because the classifier does not simply consume raw coordinates.
-
-The feature transformation provides information about:
-
-hand shape
-
-finger configuration
-
-relative finger geometry
-
-hand position
-
-scale-normalized structure
-
-relationships between both hands
-
-Feature contract
-
-Raw landmarks
-     │
-     ├── 144 values
-     │
-     ▼
-GestureFeatureExtractor
-     │
-     └── 328 engineered features
-             │
-             ▼
-      ExtraTreesClassifier
-
-5. Production Model Artifacts
-
-The project uses the following runtime artifacts.
-
-Artifact
-
-Purpose
-
-text_phrase_image_model.pkl
-
-Primary landmark ML pipeline
-
-text_phrase_image_label_encoder.pkl
-
-Converts class indices into phrase labels
-
-text_phrase_yolo_cls.pt
-
-YOLO image-classification backup model
-
-holistic_landmarker.task
-
-MediaPipe landmark model
-
-The production landmark model is intentionally not stored in Git history because of its size and repository-artifact policy.
-
-Its local integrity is documented in:
-
-models/model-manifest.json
-
-The manifest records:
-
-artifact name
-
-artifact size
-
-SHA-256 checksum
-
-framework/version
-
-pipeline structure
-
-feature dimensions
-
-classifier configuration
-
-class count
-
-reproducibility information
-
-6. Artifact Validation
-
-Before considering the project ready for demonstration or deployment, validate the production artifacts:
-
+```powershell
 python scripts/validate_artifacts.py
+```
 
-A successful validation should confirm:
+The validator checks artifact availability/integrity, serialized model loading, the 144-feature input contract, `GestureFeatureExtractor`, the 328-feature transformation contract, classifier dimensions, 43-class label compatibility, probability shape, and successful prediction decoding.
 
-Artifact integrity
-        ↓
-Production pipeline loading
-        ↓
-144-feature input contract
-        ↓
-GestureFeatureExtractor
-        ↓
-328 engineered features
-        ↓
-ExtraTreesClassifier
-        ↓
-43 output classes
-        ↓
-Label encoder compatibility
-        ↓
-Successful prediction decoding
+A successful run ends with `Status: PASS`. This is a contract-validation operation, not a training operation.
 
-The validation script is intentionally designed as a contract test, not as a training script.
+## 6. Application and API
 
-It does not retrain the model.
+`web_app.py` provides the FastAPI application and browser-facing prediction API.
 
-7. Supported Landmark Classes
+| Endpoint | Purpose |
+|---|---|
+| `GET /` | Serves the web application |
+| `GET /api/health` | Reports model/runtime availability |
+| `POST /api/predict` | Performs image prediction |
+| `/web/*` | Serves web assets |
 
-The current production label encoder contains 43 classes:
+Prediction modes:
 
+- `landmark` — primary landmark path
+- `yolo` — YOLO classifier
+- `auto` — prefer a strong landmark result, then use YOLO fallback when appropriate
+
+The API returns prediction metadata including confidence, quality, margin, hand-point counts, backend, orientation, latency, and top candidates.
+
+### Input hardening
+
+The prediction API validates image payloads before inference. It rejects missing/empty payloads, invalid Base64, empty decoded data, oversized Base64 payloads, oversized decoded image payloads, undecodable image bytes, and unsupported prediction modes.
+
+The limits are defined centrally in `web_app.py` rather than duplicated across the application.
+
+## 7. Web/API testing
+
+`tests/test_web_app.py` covers:
+
+- health response contract
+- invalid Base64 handling
+- invalid image bytes
+- empty payload handling
+- oversized payload handling
+- unsupported prediction modes
+
+The tests exercise the application contract directly without requiring a running network server for unit-level behavior.
+
+Run the complete suite:
+
+```powershell
+python -m pytest -q
+```
+
+## 8. Continuous integration
+
+`.github/workflows/ci.yml` provides the GitHub Actions quality gate.
+
+```text
+Checkout
+   ↓
+Python 3.10
+   ↓
+Install requirements-dev.txt
+   ↓
+Compile core Python modules
+   ↓
+Validate production artifacts
+   ↓
+Run pytest
+   ↓
+Check Git whitespace
+```
+
+This puts syntax validation, artifact compatibility, tests, and repository hygiene into one automated verification path.
+
+## 9. Reproducible environment
+
+`requirements.txt` records the validated runtime environment, including:
+
+- FastAPI 0.141.1
+- Uvicorn 0.52.3
+- OpenCV 5.0.0.93
+- NumPy 1.26.4
+- joblib 1.5.3
+- scikit-learn 1.6.1
+- MediaPipe 0.10.21
+- Ultralytics
+- PyTorch
+
+`requirements-dev.txt` layers development/test tooling over the runtime requirements.
+
+A baseline environment snapshot is stored at `docs/environment/baseline-pip-freeze.txt`.
+
+Do not casually change ML package versions: serialized model compatibility should be revalidated after dependency changes.
+
+## 10. Repository structure
+
+```text
+sign-language-to-speech-converter/
+├── .github/workflows/ci.yml
+├── docs/environment/baseline-pip-freeze.txt
+├── models/model-manifest.json
+├── scripts/
+│   ├── validate_artifacts.py
+│   └── diagnostics/
+│       ├── check_again_wrists.py
+│       ├── check_hungry_wrists.py
+│       ├── debug_hungry_detection.py
+│       └── diagnose_hungry.py
+├── tests/
+│   ├── test_artifact_contract.py
+│   ├── test_feature_contract.py
+│   └── test_web_app.py
+├── gesture_features.py
+├── gesture_pipeline.py
+├── gesture_dataset.py
+├── torch_gesture_model.py
+├── predict_single_gesture.py
+├── predict_phrase_yolo.py
+├── web_app.py
+├── speech_output.py
+├── create_text_gesture_data_from_images.py
+├── train_text_gesture_model.py
+├── train_yolo_phrase_model.py
+├── prepare_yolo_classification_dataset.py
+├── custom_train.py
+├── holistic_landmarker.task
+├── text_phrase_image_model.pkl
+├── text_phrase_image_label_encoder.pkl
+├── text_phrase_yolo_cls.pt
+├── text_phrase_yolo_cls.metrics.json
+├── requirements.txt
+├── requirements-dev.txt
+├── pytest.ini
+├── .gitignore
+└── README.md
+```
+
+Large datasets and experimental model backups are intentionally excluded from the normal source-control workflow.
+
+## 11. Main source modules
+
+### `gesture_features.py`
+
+Core feature engineering and production pipeline construction. Preserves the 144 → 328 feature contract.
+
+### `gesture_pipeline.py`
+
+Landmark extraction, signal-quality processing, and supporting inference logic.
+
+### `predict_single_gesture.py`
+
+Live/command-line landmark inference, production model loading, prediction handling, phrase construction, and optional speech output.
+
+```powershell
+python predict_single_gesture.py --classifier-path text_phrase_image_model.pkl --label-encoder-path text_phrase_image_label_encoder.pkl
+```
+
+With speech:
+
+```powershell
+python predict_single_gesture.py --classifier-path text_phrase_image_model.pkl --label-encoder-path text_phrase_image_label_encoder.pkl --speak
+```
+
+### `predict_phrase_yolo.py`
+
+Secondary image-classification inference using the YOLO artifact.
+
+### `web_app.py`
+
+FastAPI application, runtime registry, prediction routing, image decoding, reliability thresholds, and web serving.
+
+### `speech_output.py`
+
+Speech synthesis/output functionality.
+
+## 12. Automatic inference strategy
+
+```text
+Input image
+    │
+    ▼
+Landmark inference
+    │
+    ├── Strong result ───────► Return landmark prediction
+    │
+    └── Weak/no usable result
+                 │
+                 ▼
+          YOLO confidence check
+                 │
+                 ├── Strong enough ─► Return YOLO fallback
+                 │
+                 └── Otherwise ─────► Reject as unreliable
+```
+
+The goal is to prefer a reliable production landmark result rather than blindly returning the highest-scoring backend prediction.
+
+## 13. Reliability controls
+
+The web application uses explicit acceptance thresholds for:
+
+- landmark confidence
+- landmark probability margin
+- landmark visibility/quality
+- minimum detected hand points
+- YOLO confidence
+- stricter YOLO confidence for automatic fallback
+
+These are application-level acceptance controls and do not modify trained model weights.
+
+## 14. Speech and sentence handling
+
+Recognized signs can be accumulated into a sentence and passed to the speech layer. Recognition, sentence handling, and audio output remain separate concerns.
+
+## 15. Supported production classes
+
+The production label encoder contains 43 classes:
+
+```text
 again
 agree
 answer
@@ -318,553 +383,242 @@ understand
 wait
 where
 write
+```
 
-8. Repository Structure
+## 16. Training and production-model policy
 
-sign-language-to-speech-converter/
-│
-├── models/
-│   ├── model-manifest.json
-│   └── README.md
-│
-├── scripts/
-│   └── validate_artifacts.py
-│
-├── gesture_features.py
-├── gesture_pipeline.py
-├── gesture_dataset.py
-├── torch_gesture_model.py
-│
-├── predict_single_gesture.py
-├── predict_phrase_yolo.py
-├── web_app.py
-│
-├── create_text_gesture_data_from_images.py
-├── train_text_gesture_model.py
-├── test_text_gesture_model.py
-│
-├── prepare_yolo_classification_dataset.py
-├── train_yolo_phrase_model.py
-├── custom_train.py
-│
-├── speech_output.py
-├── test_text_gesture_model.py
-│
-├── holistic_landmarker.task
-├── text_phrase_image_label_encoder.pkl
-├── text_phrase_yolo_cls.pt
-├── text_phrase_yolo_cls.metrics.json
-│
-├── images for phrases/
-├── text_phrase_image_data/
-├── yolo_phrase_dataset/
-│
-├── web/
-├── README.md
-└── .gitignore
+Training scripts are retained for reproducibility and future experimentation:
 
-Dataset directories and large model artifacts may intentionally remain local rather than being committed to Git.
+- `train_text_gesture_model.py`
+- `train_yolo_phrase_model.py`
+- `custom_train.py`
 
-9. Important Source Files
+Repository hardening does **not** require retraining the production landmark model. The existing serialized artifact remains authoritative.
 
-gesture_features.py
+## 17. Dataset generation
 
-Core feature-engineering module.
+Landmark dataset generation is handled by `create_text_gesture_data_from_images.py`:
 
-Responsibilities:
-
-validate the 144-feature input contract
-
-separate face and hand landmarks
-
-calculate a hand-centered reference frame
-
-normalize landmarks
-
-calculate hand-relative features
-
-calculate fingertip distances
-
-calculate joint-angle features
-
-calculate two-hand relationships
-
-construct the final 328-feature representation
-
-construct the scikit-learn production pipeline
-
-This is one of the most important ML files in the repository.
-
-gesture_pipeline.py
-
-Responsible for the landmark-extraction and quality-processing layer.
-
-It defines the expected landmark representation and supporting processing logic used before classification.
-
-gesture_dataset.py
-
-Responsible for dataset loading, organization, and dataset splitting used by the training/evaluation workflow.
-
-predict_single_gesture.py
-
-Primary live landmark inference application.
-
-Typical responsibilities:
-
-camera initialization
-
-landmark extraction
-
-preprocessing
-
-production model loading
-
-prediction
-
-confidence handling
-
-phrase construction
-
-user controls
-
-optional speech output
-
-Recommended command:
-
-python predict_single_gesture.py --classifier-path text_phrase_image_model.pkl --label-encoder-path text_phrase_image_label_encoder.pkl
-
-With speech:
-
-python predict_single_gesture.py --classifier-path text_phrase_image_model.pkl --label-encoder-path text_phrase_image_label_encoder.pkl --speak
-
-predict_phrase_yolo.py
-
-Secondary image-based inference path using the YOLO classifier.
-
-Example:
-
-python predict_phrase_yolo.py --model-path text_phrase_yolo_cls.pt --class-map yolo_phrase_dataset/class_name_map.json
-
-The YOLO path is useful as a backup for gestures where reliable landmarks cannot be obtained.
-
-web_app.py
-
-Browser-based application layer.
-
-The web application provides:
-
-webcam prediction
-
-image upload prediction
-
-model selection
-
-landmark inference
-
-YOLO inference
-
-automatic fallback
-
-sentence construction
-
-speech output
-
-result-focused UI
-
-Run:
-
-python web_app.py
-
-Then open:
-
-http://127.0.0.1:8000
-
-10. Automatic Inference Strategy
-
-The web application supports three model modes:
-
-AUTO
-LANDMARK
-YOLO
-
-Auto mode
-
-The intended strategy is:
-
-Input
-  │
-  ▼
-Landmark extraction
-  │
-  ├── Reliable landmarks
-  │       │
-  │       ▼
-  │   Landmark model
-  │
-  └── Unreliable landmarks
-          │
-          ▼
-     YOLO fallback
-
-This allows the system to retain the stronger landmark-based pipeline while still having an image-classification fallback.
-
-11. Sentence Construction
-
-The application does not stop at individual classification.
-
-Accepted predictions can be accumulated into a sentence.
-
-Typical controls include:
-
-Key
-
-Action
-
-B
-
-Undo last word
-
-S
-
-Speak sentence
-
-C
-
-Clear sentence
-
-Q
-
-Quit
-
-The web interface provides equivalent controls.
-
-The application also uses stability/acceptance logic so that noisy frame-to-frame predictions do not automatically become repeated words.
-
-12. Speech Layer
-
-speech_output.py contains the speech-output functionality.
-
-The system can:
-
-Recognized phrase
-      ↓
-Sentence text
-      ↓
-Speech engine
-      ↓
-Audio output
-
-The web application can queue speech so recognition does not unnecessarily block on audio playback.
-
-13. YOLO Backup Architecture
-
-The project also contains an image-based classification path:
-
-Image
-  ↓
-YOLO classifier
-  ↓
-Phrase class
-
-Related files:
-
-prepare_yolo_classification_dataset.py
-train_yolo_phrase_model.py
-predict_phrase_yolo.py
-text_phrase_yolo_cls.pt
-text_phrase_yolo_cls.metrics.json
-
-This path should be treated as a secondary approach rather than replacing the current production landmark model.
-
-14. Training Code Policy
-
-The repository contains training scripts for reproducibility and future experimentation:
-
-train_text_gesture_model.py
-train_yolo_phrase_model.py
-custom_train.py
-
-However:
-
-The current project improvement workflow does not require retraining the production model.
-
-The existing serialized production model remains authoritative.
-
-Training scripts should therefore not be executed merely to improve repository quality.
-
-15. Dataset Generation
-
-Landmark dataset generation is handled by:
-
-create_text_gesture_data_from_images.py
-
-The process is approximately:
-
-Phrase image folders
-        ↓
+```text
+Phrase images
+    ↓
 MediaPipe landmark extraction
-        ↓
+    ↓
 Landmark validation
-        ↓
-CSV dataset
-        ↓
+    ↓
+CSV representation
+    ↓
 Training/evaluation workflow
+```
 
-The YOLO dataset preparation process is handled separately by:
+YOLO dataset preparation is handled by `prepare_yolo_classification_dataset.py`.
 
-prepare_yolo_classification_dataset.py
+Dataset folders are not intended to be committed wholesale because of repository size and artifact-management constraints.
 
-16. Testing and Validation
+## 18. Diagnostics
 
-The repository contains multiple layers of verification.
+Targeted diagnostic scripts live under `scripts/diagnostics/`.
 
-Artifact validation
+They are investigation tools, not production inference paths. The hungry/again diagnostics were introduced to investigate landmark-detection quality without altering production model weights.
 
-python scripts/validate_artifacts.py
+Keeping diagnostics separate prevents experimental investigation from becoming an accidental runtime dependency.
 
-Existing landmark-model test
+## 19. Security and repository hygiene
 
-python test_text_gesture_model.py
+`.gitignore` excludes common unsafe or unnecessary development artifacts, including:
 
-Basic application validation
+- virtual environments
+- Python cache files
+- local `.env` files
+- logs and temporary files
+- tool caches
+- datasets
+- experimental/backup model artifacts
 
-python -m py_compile gesture_features.py gesture_pipeline.py predict_single_gesture.py predict_phrase_yolo.py web_app.py
+Never commit API keys, passwords, access tokens, private credentials, or local `.env` files.
 
-The goal is to distinguish:
+The API also applies bounded image-payload validation before expensive ML inference.
 
-Syntax correctness
-        +
-Artifact correctness
-        +
-Pipeline contract correctness
-        +
-Runtime correctness
-        +
-Application behavior
+## 20. Reproducibility and artifact provenance
 
-rather than relying on one test alone.
+`models/model-manifest.json` records artifact size, SHA-256 fingerprint, framework/version information, pipeline structure, feature dimensions, classifier configuration, class count, random state, and production estimator count.
 
-17. Reproducibility
+Production classifier configuration:
 
-The production model uses:
-
+```text
 random_state = 42
 n_estimators = 250
 n_jobs = 1
+min_samples_leaf = 1
+```
 
-The current production artifact is authoritative.
+The training factory default estimator count is separately recorded as 350. This difference is metadata and should not trigger production retraining.
 
-The training factory currently exposes a different default estimator count. This difference is documented deliberately and should not be interpreted as a request to retrain the production model.
+## 21. Development workflow
 
-The artifact manifest is the source of truth for the serialized production model.
+Use a small, evidence-driven change cycle:
 
-18. Security and Repository Hygiene
+```text
+Inspect implementation
+        ↓
+Confirm contract
+        ↓
+Make smallest useful change
+        ↓
+Run syntax checks
+        ↓
+Validate production artifacts
+        ↓
+Run targeted tests
+        ↓
+Run full pytest suite
+        ↓
+Review diff / whitespace
+        ↓
+Commit focused change
+        ↓
+Push and verify CI
+```
 
-The repository intentionally excludes:
+Avoid broad rewrites when a focused engineering improvement is sufficient.
 
-virtual environments
+## 22. Validation commands
 
-Python cache files
+Compile core modules:
 
-local environment files
+```powershell
+python -m py_compile gesture_features.py gesture_pipeline.py predict_single_gesture.py predict_phrase_yolo.py web_app.py speech_output.py
+```
 
-datasets
+Validate production artifacts:
 
-experimental model backups
-
-large serialized experimental artifacts
-
-tool caches
-
-Configured in:
-
-.gitignore
-
-Do not commit:
-
-.venv/
-.env
-datasets
-temporary files
-large experimental model backups
-
-Never commit API keys, passwords, tokens, or private credentials.
-
-19. Current Production Artifact Fingerprints
-
-The local production artifacts are identified by SHA-256 fingerprints in models/model-manifest.json.
-
-This provides an integrity mechanism:
-
-Artifact
-   ↓
-SHA-256
-   ↓
-Manifest
-   ↓
-Validation
-
-If an artifact changes unexpectedly, validation should fail instead of silently treating the changed file as the same production model.
-
-20. Quick Start
-
-Step 1 — Activate environment
-
-.\.venv\Scripts\Activate.ps1
-
-Step 2 — Validate artifacts
-
+```powershell
 python scripts/validate_artifacts.py
+```
 
-Step 3 — Run the primary predictor
+Run tests:
 
-python predict_single_gesture.py --classifier-path text_phrase_image_model.pkl --label-encoder-path text_phrase_image_label_encoder.pkl
+```powershell
+python -m pytest -q
+```
 
-Step 4 — Run the web application
+Check whitespace:
 
+```powershell
+git diff --check
+```
+
+Check repository state:
+
+```powershell
+git status -sb
+```
+
+## 23. Quick start
+
+Activate the environment:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+Install development/runtime dependencies:
+
+```powershell
+python -m pip install -r requirements-dev.txt
+```
+
+Validate artifacts:
+
+```powershell
+python scripts/validate_artifacts.py
+```
+
+Run tests:
+
+```powershell
+python -m pytest -q
+```
+
+Start the web application:
+
+```powershell
 python web_app.py
+```
 
 Open:
 
+```text
 http://127.0.0.1:8000
+```
 
-21. Recommended Development Workflow
+## 24. Engineering principles
 
-For changes to the repository, use this order:
+### Explicit contracts
 
-1. Inspect existing implementation
-        ↓
-2. Define the contract
-        ↓
-3. Make the smallest useful change
-        ↓
-4. Run syntax checks
-        ↓
-5. Run artifact validation
-        ↓
-6. Run targeted functional tests
-        ↓
-7. Review Git diff
-        ↓
-8. Commit with a focused message
+Critical interfaces are validated instead of assumed:
 
-Avoid unnecessary rewrites.
+```text
+144 raw features
+      ↓
+328 engineered features
+      ↓
+43 classifier outputs
+```
 
-Avoid changing the production ML model unless explicitly required.
+### Separation of concerns
 
-22. Engineering Principles
-
-This project follows several principles intended to make the repository easier to review and maintain:
-
-Separation of concerns
-
+```text
 Landmark extraction
         ≠
 Feature engineering
         ≠
 Classification
         ≠
-Application UI
+API routing
+        ≠
+Sentence handling
         ≠
 Speech output
+```
 
-Explicit contracts
+### Fail-fast validation
 
-Important interfaces such as:
+Invalid artifacts, incompatible dimensions, malformed API input, and unreliable predictions should be detected explicitly rather than silently accepted.
 
-144 raw features
+### Minimal-change engineering
 
-328 engineered features
+Every change should have a clear reliability, maintainability, reproducibility, security, or deployment benefit.
 
-43 classes
+### Production artifact preservation
 
-artifact checksums
+Do not replace or retrain the production model merely because repository engineering can be improved without changing model weights.
 
-are explicitly validated.
+## 25. Current project direction
 
-Reproducibility
+The repository is being hardened toward expert-level software/ML engineering quality while preserving the existing production model.
 
-Production artifact metadata is stored separately from experimental training code.
+Priority areas are:
 
-Fail-fast validation
+1. production artifact integrity
+2. deterministic contracts
+3. API/runtime reliability
+4. automated tests
+5. CI quality gates
+6. reproducible environments
+7. repository hygiene
+8. operational documentation
 
-Incorrect artifacts or incompatible model contracts should be detected before runtime inference.
+The objective is not complexity for its own sake. Each component should provide measurable engineering value.
 
-No unnecessary retraining
+## License and model/data provenance
 
-Existing trained models are preserved when repository engineering improvements can be achieved without changing model weights.
+Before public distribution, add an appropriate software license and document:
 
-23. Project Status
+- dataset sources and permissions
+- third-party model licenses
+- MediaPipe/Ultralytics usage requirements
+- model provenance
+- restrictions on commercial use
 
-The project currently contains:
-
-a production landmark-based ML pipeline
-
-a 328-feature engineered representation
-
-a 43-class ExtraTrees classifier
-
-a YOLO backup classifier
-
-MediaPipe landmark extraction
-
-live inference
-
-web inference
-
-speech output
-
-artifact integrity metadata
-
-automated production-artifact validation
-
-The current engineering focus is on improving:
-
-Architecture
-Documentation
-Validation
-Reproducibility
-Maintainability
-Testing
-Deployment readiness
-Repository quality
-
-without retraining the production ML model.
-
-24. Final Architecture Summary
-
-                         SIGN LANGUAGE SYSTEM
-                                  │
-             ┌────────────────────┴────────────────────┐
-             │                                         │
-             ▼                                         ▼
-       Landmark Path                              YOLO Path
-             │                                         │
-      MediaPipe Holistic                         Input Image
-             │                                         │
-       144 raw values                            YOLO Model
-             │                                         │
-   GestureFeatureExtractor                       Prediction
-             │                                         │
-      328 engineered                              Phrase
-        features                                     │
-             │                                         │
-     ExtraTreesClassifier                            │
-             │                                         │
-        43 classes                                    │
-             │                                         │
-             └────────────────────┬────────────────────┘
-                                  │
-                                  ▼
-                         Phrase / Sentence
-                                  │
-                    ┌─────────────┴─────────────┐
-                    │                           │
-                    ▼                           ▼
-              Web Interface               Speech Output
-
-License / Usage
-
-Add the appropriate license before distributing the repository publicly if the project is intended for external use.
-
-For academic/project evaluation, document the dataset sources, model provenance, and any third-party model licenses used by the project.
+Do not claim dataset or model ownership without verifying the original source and license.
