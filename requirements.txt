@@ -1,0 +1,13 @@
+# Runtime dependencies for sign-language-to-speech-converter
+# Generated from the validated local environment.
+# Do not change ML dependency versions without re-validating production artifacts.
+
+fastapi==0.141.1
+uvicorn==0.52.3
+opencv-python==5.0.0.93
+numpy==1.26.4
+joblib==1.5.3
+scikit-learn==1.6.1
+mediapipe==0.10.21
+ultralytics
+torch

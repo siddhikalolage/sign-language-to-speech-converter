@@ -1,6 +1,9 @@
-﻿-r web_requirements.txt
+# Development dependencies
+# Install runtime dependencies first:
+#   pip install -r requirements.txt
+
+-r requirements.txt
 
 pytest==8.4.2
-matplotlib==3.10.9
-seaborn
-torch
+httpx
+ruff
